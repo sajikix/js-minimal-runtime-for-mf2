@@ -1,16 +1,11 @@
-static RESERVED_WORDS: [&str; 4] = ["var", "function", "return", "new"];
+static RESERVED_WORDS: [&str; 4] = ["const", "function", "return", "new"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
-    /// https://262.ecma-international.org/#sec-punctuators
     Punctuator(char),
-    /// https://262.ecma-international.org/#sec-literals-numeric-literals
     Number(u64),
-    /// https://262.ecma-international.org/#sec-identifier-names
     Identifier(String),
-    /// https://262.ecma-international.org/#sec-keywords-and-reserved-words
     Keyword(String),
-    /// https://262.ecma-international.org/#sec-literals-string-literals
     StringLiteral(String),
 }
 
@@ -20,10 +15,10 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(input: &str) -> Self {
+    pub fn new(src: &str) -> Self {
         Self {
             pos: 0,
-            input: input.chars().collect(),
+            input: src.chars().collect(),
         }
     }
 
@@ -91,7 +86,7 @@ impl Iterator for Lexer {
         let c = self.input[self.pos];
 
         let token = match c {
-            '+' | '-' | ';' | '=' | '(' | ')' | '{' | '}' | ',' | '.' => {
+            '+' | '-' | ';' | '=' | '(' | ')' | '{' | '}' | ',' | '.' | ':' => {
                 let t = Token::Punctuator(c);
                 self.pos += 1;
                 t
