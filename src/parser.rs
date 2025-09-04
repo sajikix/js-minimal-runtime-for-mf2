@@ -4,9 +4,6 @@ use crate::lexer;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Node {
-    Program {
-        body: Vec<Node>,
-    },
     VariableDeclaration {
         id: Box<Node>,
         init: Box<Node>,
@@ -44,9 +41,6 @@ pub enum Node {
 }
 
 impl Node {
-    pub fn new_program(body: Vec<Node>) -> Self {
-        Node::Program { body }
-    }
     pub fn new_variable_declaration(id: Node, init: Node) -> Self {
         Node::VariableDeclaration {
             id: Box::new(id),
@@ -94,6 +88,21 @@ impl Node {
             key,
             value: Box::new(value),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Program {
+    pub body: Vec<Node>,
+}
+
+impl Program {
+    pub fn new() -> Self {
+        Self { body: Vec::new() }
+    }
+
+    pub fn set_body(&mut self, body: Vec<Node>) {
+        self.body = body;
     }
 }
 
@@ -229,7 +238,6 @@ impl Parser {
             match t {
                 lexer::Token::Identifier(name) => {
                     let property = name.clone();
-                    println!("Found identifier in member expression: {}", property);
                     members.push(property);
                     match &self.lexer.peek() {
                         Some(lexer::Token::Punctuator('.')) => {
@@ -272,7 +280,6 @@ impl Parser {
         match t {
             lexer::Token::Keyword(k) => match k.as_str() {
                 "new" => {
-                    println!("Parsing 'new' expression");
                     self.lexer.next(); // consume 'new'
                     return Some(self.parse_new_expression());
                 }
@@ -289,7 +296,6 @@ impl Parser {
             Some(token) => token,
             None => return expr,
         };
-        println!("Peeked token in assignment expression: {:?}", t);
         match t {
             lexer::Token::Punctuator('=') => {
                 self.lexer.next();
@@ -363,7 +369,8 @@ impl Parser {
         node
     }
 
-    pub fn parse(&mut self) -> Node {
+    pub fn parse(&mut self) -> Program {
+        let mut program = Program::new();
         let mut body = Vec::new();
         loop {
             let node = self.parse_statement();
@@ -371,7 +378,8 @@ impl Parser {
             match node {
                 Some(n) => body.push(n),
                 None => {
-                    return Node::new_program(body.clone());
+                    program.set_body(body);
+                    return program;
                 }
             }
         }
