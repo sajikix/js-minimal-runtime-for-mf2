@@ -7,6 +7,10 @@ use std::rc::Rc;
 use core::fmt::Display;
 use core::fmt::Formatter;
 use core::ops::Add;
+//
+
+use mf2_parser::parser::Mf2Parser;
+use mf2_parser::model::{Message, PatternItem, Expression};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageFormatInstance {
@@ -42,6 +46,8 @@ pub enum RuntimeValue {
     MessageFormatInstance(MessageFormatInstance),
     //
     MessageFormatMethod(MessageFormatMethod),
+    // Object type for JS objects
+    Object(HashMap<String, RuntimeValue>),
 }
 
 impl Add<RuntimeValue> for RuntimeValue {
@@ -83,6 +89,7 @@ impl Display for RuntimeValue {
             RuntimeValue::StringLiteral(value) => value.to_string(),
             RuntimeValue::MessageFormatInstance(_) => "[object Intl.MessageFormat]".to_string(),
             RuntimeValue::MessageFormatMethod(_) => "[object Intl.MessageFormatMethod]".to_string(),
+            RuntimeValue::Object(_) => "[object Object]".to_string(),
         };
         write!(f, "{}", s)
     }
@@ -248,6 +255,17 @@ impl Runtime {
                 }
                 None
             }
+            Node::ObjectExpression { properties } => {
+                let mut object = HashMap::new();
+                for prop in properties {
+                    if let Node::Property { key, value } = prop {
+                        if let Some(val) = self.eval(Some(*value), env.clone()) {
+                            object.insert(key, val);
+                        }
+                    }
+                }
+                Some(RuntimeValue::Object(object))
+            }
             Node::Identifier(name) => {
                 println!("Evaluating identifier: {}", name);
                 println!("environment: {:?}", env.borrow().nest);
@@ -277,6 +295,56 @@ impl Runtime {
             "Calling Intl.MessageFormat method: {} on instance: {:?} with args: {:?}",
             method.method, method.instance, args
         );
-        return method.instance.message.to_string(); // TODO: 実装
+        if method.method != "format" {
+            return "".to_string(); // 未対応のメソッドは空文字を返す
+        }
+        
+        // argsをevalして、変数マップを取得
+        let variables = match self.eval(Some(args), env.clone()) {
+            Some(RuntimeValue::Object(map)) => map,
+            _ => HashMap::new(),
+        };
+        
+        let mut mf2_parser = Mf2Parser::new(&method.instance.message);
+        let ast = mf2_parser.parse();
+        println!("Parsed message format AST: {:?}", ast);
+        
+        // ASTをvariablesを使ってフォーマット
+        match ast {
+            Ok(Message::Pattern(pattern_msg)) => {
+                self.format_message(&pattern_msg, &variables)
+            }
+            _ => method.instance.message.to_string(),
+        }
+    }
+    
+    fn format_message(
+        &self,
+        pattern_msg: &mf2_parser::model::PatternMessage,
+        variables: &HashMap<String, RuntimeValue>,
+    ) -> String {
+        let mut result = String::new();
+        
+        for item in pattern_msg.pattern() {
+            match item {
+                PatternItem::String(s) => {
+                    result.push_str(s);
+                }
+                PatternItem::Expression(Expression::Variable(var_expr)) => {
+                    let var_name = var_expr.get_variable_name();
+                    if let Some(value) = variables.get(&var_name) {
+                        result.push_str(&value.to_string());
+                    } else {
+                        // 変数が見つからない場合は、{$name}の形式で出力
+                        result.push_str(&format!("{{${}}}", var_name));
+                    }
+                }
+                _ => {
+                    // その他のExpressionタイプは今回は未対応
+                }
+            }
+        }
+        
+        result
     }
 }

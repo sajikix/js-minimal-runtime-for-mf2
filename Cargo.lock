@@ -5,3 +5,10 @@ version = 4
 [[package]]
 name = "js-minimal-runtime-for-mf2"
 version = "0.1.0"
+dependencies = [
+ "mf2_parser",
+]
+
+[[package]]
+name = "mf2_parser"
+version = "0.1.0"
