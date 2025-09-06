@@ -206,7 +206,9 @@ impl Runtime {
                 Some(object_result + RuntimeValue::StringLiteral(".".to_string()) + property_result)
             }
             Node::CallExpression { callee, arguments } => {
-                let callee = match self.eval(Some(*callee), env.clone()) {
+                // localな環境を作成
+                let local_env = Rc::new(RefCell::new(Environment::new(Some(env))));
+                let callee = match self.eval(Some(*callee), local_env.clone()) {
                     Some(value) => value,
                     None => return None,
                 };
@@ -216,7 +218,11 @@ impl Runtime {
                 // calleeがMessageFormatMethodの場合、対応するメソッドを呼び出す
                 if let RuntimeValue::MessageFormatMethod(mf_method) = callee {
                     return Some(RuntimeValue::StringLiteral(
-                        self.call_intl_message_format_method(mf_method, first_arg, env.clone()),
+                        self.call_intl_message_format_method(
+                            mf_method,
+                            first_arg,
+                            local_env.clone(),
+                        ),
                     ));
                 }
                 None
