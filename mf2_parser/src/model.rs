@@ -10,7 +10,7 @@ pub enum Message {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PatternMessage {
     declarations: Vec<Declaration>,
-    pattern: Vec<PatternItem>,
+    pub pattern: Vec<PatternItem>,
 }
 
 impl PatternMessage {

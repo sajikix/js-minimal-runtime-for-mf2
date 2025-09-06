@@ -413,7 +413,6 @@ impl Mf2Parser {
                     break; // end of pattern
                 }
                 _ => {
-                    println!("char: {}", self.src[self.pos]);
                     text.push(self.src[self.pos]);
                     self.pos += 1; // consume the char
                 }

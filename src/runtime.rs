@@ -9,8 +9,8 @@ use core::fmt::Formatter;
 use core::ops::Add;
 //
 
+use crate::printer::{FormatValue, MF2Printer};
 use mf2_parser::parser::Mf2Parser;
-use mf2_parser::model::{Message, PatternItem, Expression};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageFormatInstance {
@@ -69,19 +69,6 @@ impl Add<RuntimeValue> for RuntimeValue {
     }
 }
 
-// impl Sub<RuntimeValue> for RuntimeValue {
-//     type Output = RuntimeValue;
-
-//     fn sub(self, rhs: RuntimeValue) -> RuntimeValue {
-//         if let (RuntimeValue::Number(left_num), RuntimeValue::Number(right_num)) = (&self, &rhs) {
-//             return RuntimeValue::Number(left_num - right_num);
-//         }
-
-//         // NaN: Not a Number
-//         RuntimeValue::Number(u64::MIN)
-//     }
-// }
-
 impl Display for RuntimeValue {
     fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
         let s = match self {
@@ -94,6 +81,8 @@ impl Display for RuntimeValue {
         write!(f, "{}", s)
     }
 }
+
+impl FormatValue for RuntimeValue {}
 
 pub struct Environment {
     variables: HashMap<String, RuntimeValue>,
@@ -113,18 +102,9 @@ impl Environment {
 
     pub fn define_var(&mut self, name: String, value: RuntimeValue) {
         self.variables.insert(name.clone(), value);
-        println!(
-            "- Defined variable: {:?} nest {}",
-            self.variables.get(&name),
-            self.nest
-        );
     }
 
     pub fn get_var(&self, name: &str) -> Option<RuntimeValue> {
-        println!(
-            "- Getting variable: {} for {:?} nest:{}",
-            name, self.variables, self.nest
-        );
         if let Some(value) = self.variables.get(name) {
             Some(value.clone())
         } else if let Some(outer) = &self.outer {
@@ -142,11 +122,12 @@ impl Runtime {
     }
     pub fn execute(&mut self, program: Program) {
         let env = Rc::new(RefCell::new(Environment::new(None)));
+        let mut result = None;
         for node in program.body {
-            // println!("{:?}", node);
-            let result = self.eval(Some(node), env.clone());
-            println!("Result: {:?}", result);
-            // 実行ロジックをここに実装
+            result = self.eval(Some(node), env.clone());
+        }
+        if let Some(res) = result {
+            println!("> {}", res.to_string());
         }
     }
 
@@ -167,9 +148,7 @@ impl Runtime {
                     Node::Identifier(name) => name.clone(),
                     _ => panic!("Expected identifier in variable declaration"),
                 };
-                println!("Declaring variable: {}", var_name);
                 let init_result = self.eval(Some(*init), env.clone());
-                println!("Initialized value: {:?}", init_result);
                 env.borrow_mut().define_var(
                     var_name,
                     init_result.unwrap_or(RuntimeValue::StringLiteral("undefined".to_string())),
@@ -184,10 +163,6 @@ impl Runtime {
                         args_result.push(arg_value);
                     }
                 }
-                println!(
-                    "Calling new expression: {:?} with args: {:?}",
-                    callee_result, args_result
-                );
                 if callee_result
                     == Some(RuntimeValue::StringLiteral(
                         "Intl.MessageFormat".to_string(),
@@ -217,14 +192,8 @@ impl Runtime {
                     Some(value) => value,
                     None => return Some(object_result),
                 };
-                // TODO: 色々チェック
-                println!(
-                    "Accessing member: {:?} on {:?}",
-                    property_result, object_result
-                );
 
                 if let RuntimeValue::MessageFormatInstance(instance) = object_result {
-                    println!("Detected Intl.MessageFormat instance");
                     return Some(RuntimeValue::MessageFormatMethod(MessageFormatMethod::new(
                         instance,
                         if let RuntimeValue::StringLiteral(method) = property_result {
@@ -241,12 +210,9 @@ impl Runtime {
                     Some(value) => value,
                     None => return None,
                 };
-                println!("Calling function: {:?}", callee);
 
                 let first_arg = arguments.get(0).unwrap().clone();
-                for arg in arguments {
-                    println!("With argument: {:?}", arg);
-                }
+
                 // calleeがMessageFormatMethodの場合、対応するメソッドを呼び出す
                 if let RuntimeValue::MessageFormatMethod(mf_method) = callee {
                     return Some(RuntimeValue::StringLiteral(
@@ -267,8 +233,6 @@ impl Runtime {
                 Some(RuntimeValue::Object(object))
             }
             Node::Identifier(name) => {
-                println!("Evaluating identifier: {}", name);
-                println!("environment: {:?}", env.borrow().nest);
                 match env.borrow_mut().get_var(&name.to_string()) {
                     Some(v) => Some(v),
                     // 変数名が初めて使用される場合は、まだ値は保存されていないので、文字列として扱う
@@ -278,10 +242,7 @@ impl Runtime {
             }
             Node::NumericLiteral(value) => Some(RuntimeValue::Number(value)),
             Node::StringLiteral(value) => Some(RuntimeValue::StringLiteral(value.clone())),
-            _ => {
-                println!("Evaluating node(not implemented): {:?}", node);
-                None
-            }
+            _ => None,
         }
     }
 
@@ -291,60 +252,22 @@ impl Runtime {
         args: Node,
         env: Rc<RefCell<Environment>>,
     ) -> String {
-        println!(
-            "Calling Intl.MessageFormat method: {} on instance: {:?} with args: {:?}",
-            method.method, method.instance, args
-        );
         if method.method != "format" {
             return "".to_string(); // 未対応のメソッドは空文字を返す
         }
-        
         // argsをevalして、変数マップを取得
         let variables = match self.eval(Some(args), env.clone()) {
             Some(RuntimeValue::Object(map)) => map,
             _ => HashMap::new(),
         };
-        
+
         let mut mf2_parser = Mf2Parser::new(&method.instance.message);
         let ast = mf2_parser.parse();
-        println!("Parsed message format AST: {:?}", ast);
-        
+
         // ASTをvariablesを使ってフォーマット
         match ast {
-            Ok(Message::Pattern(pattern_msg)) => {
-                self.format_message(&pattern_msg, &variables)
-            }
+            Ok(message) => MF2Printer::print(&message, &variables),
             _ => method.instance.message.to_string(),
         }
-    }
-    
-    fn format_message(
-        &self,
-        pattern_msg: &mf2_parser::model::PatternMessage,
-        variables: &HashMap<String, RuntimeValue>,
-    ) -> String {
-        let mut result = String::new();
-        
-        for item in pattern_msg.pattern() {
-            match item {
-                PatternItem::String(s) => {
-                    result.push_str(s);
-                }
-                PatternItem::Expression(Expression::Variable(var_expr)) => {
-                    let var_name = var_expr.get_variable_name();
-                    if let Some(value) = variables.get(&var_name) {
-                        result.push_str(&value.to_string());
-                    } else {
-                        // 変数が見つからない場合は、{$name}の形式で出力
-                        result.push_str(&format!("{{${}}}", var_name));
-                    }
-                }
-                _ => {
-                    // その他のExpressionタイプは今回は未対応
-                }
-            }
-        }
-        
-        result
     }
 }

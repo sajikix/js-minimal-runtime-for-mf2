@@ -1,36 +1,36 @@
-fn is_quoted_char(c: char) -> bool {
-    match c {
-        '\u{01}'..='\u{5B}' => true, // omit NULL (%x00) and \ (%x5C)
-        '\u{5D}'..='\u{7B}' => true, // omit | (%x7C)
-        '\u{7D}'..='\u{10FFFF}' => true,
-        _ => false,
-    }
-}
+// fn is_quoted_char(c: char) -> bool {
+//     match c {
+//         '\u{01}'..='\u{5B}' => true, // omit NULL (%x00) and \ (%x5C)
+//         '\u{5D}'..='\u{7B}' => true, // omit | (%x7C)
+//         '\u{7D}'..='\u{10FFFF}' => true,
+//         _ => false,
+//     }
+// }
 
-pub fn is_simple_start_char(c: char) -> bool {
-    match c {
-        '\u{01}'..='\u{08}' => true, // mit NULL (%x00), HTAB (%x09) and LF (%x0A)
-        '\u{0B}'..='\u{0C}' => true, // omit CR (%x0D)
-        '\u{0E}'..='\u{1F}' => true, // omit SP (%x20)
-        '\u{21}'..='\u{2D}' => true, // omit . (%x2E)
-        '\u{2F}'..='\u{5B}' => true, // omit \ (%x5C)
-        '\u{5D}'..='\u{7A}' => true, // omit { (%x7B)
-        '\u{7c}' => true,            // omit } (%x7D)
-        '\u{7E}'..='\u{2FFF}' => true, // omit IDEOGRAPHIC SPACE (%x3000)
-        '\u{3001}'..='\u{10FFFF}' => true, // allowing surrogates is intentional
-        _ => false,
-    }
-}
+// pub fn is_simple_start_char(c: char) -> bool {
+//     match c {
+//         '\u{01}'..='\u{08}' => true, // mit NULL (%x00), HTAB (%x09) and LF (%x0A)
+//         '\u{0B}'..='\u{0C}' => true, // omit CR (%x0D)
+//         '\u{0E}'..='\u{1F}' => true, // omit SP (%x20)
+//         '\u{21}'..='\u{2D}' => true, // omit . (%x2E)
+//         '\u{2F}'..='\u{5B}' => true, // omit \ (%x5C)
+//         '\u{5D}'..='\u{7A}' => true, // omit { (%x7B)
+//         '\u{7c}' => true,            // omit } (%x7D)
+//         '\u{7E}'..='\u{2FFF}' => true, // omit IDEOGRAPHIC SPACE (%x3000)
+//         '\u{3001}'..='\u{10FFFF}' => true, // allowing surrogates is intentional
+//         _ => false,
+//     }
+// }
 
-fn is_text_char(c: char) -> bool {
-    match c {
-        '\u{01}'..='\u{5B}' => true,     // omit NULL (%x00) and \ (%x5C)
-        '\u{5D}'..='\u{7A}' => true,     // omit { (%x7B)
-        '\u{7c}' => true,                // omit } (%x7D)
-        '\u{7E}'..='\u{10FFFF}' => true, // allowing surrogates is intentional
-        _ => false,
-    }
-}
+// fn is_text_char(c: char) -> bool {
+//     match c {
+//         '\u{01}'..='\u{5B}' => true,     // omit NULL (%x00) and \ (%x5C)
+//         '\u{5D}'..='\u{7A}' => true,     // omit { (%x7B)
+//         '\u{7c}' => true,                // omit } (%x7D)
+//         '\u{7E}'..='\u{10FFFF}' => true, // allowing surrogates is intentional
+//         _ => false,
+//     }
+// }
 
 fn is_alpha_char(c: char) -> bool {
     match c {
@@ -105,72 +105,72 @@ pub fn is_bidi_char(c: char) -> bool {
 }
 
 // TODO use this validation in parser
-pub fn is_valid_quoted_literal_string(s: &str) -> bool {
-    let mut escaped = false;
-    for c in s.chars() {
-        match c {
-            '|' => {
-                if !escaped {
-                    return false;
-                }
-                escaped = false;
-                continue;
-            }
-            '\u{5C}' => {
-                escaped = !escaped;
-            }
-            _ => {
-                if escaped {
-                    // '{' and is allowed for escaped char
-                    if c == '{' || c == '}' {
-                        escaped = false;
-                        continue;
-                    }
-                    return false;
-                }
-                if !is_quoted_char(c) {
-                    return false;
-                }
-                continue;
-            }
-        }
-    }
-    return !escaped;
-}
+// pub fn is_valid_quoted_literal_string(s: &str) -> bool {
+//     let mut escaped = false;
+//     for c in s.chars() {
+//         match c {
+//             '|' => {
+//                 if !escaped {
+//                     return false;
+//                 }
+//                 escaped = false;
+//                 continue;
+//             }
+//             '\u{5C}' => {
+//                 escaped = !escaped;
+//             }
+//             _ => {
+//                 if escaped {
+//                     // '{' and is allowed for escaped char
+//                     if c == '{' || c == '}' {
+//                         escaped = false;
+//                         continue;
+//                     }
+//                     return false;
+//                 }
+//                 if !is_quoted_char(c) {
+//                     return false;
+//                 }
+//                 continue;
+//             }
+//         }
+//     }
+//     return !escaped;
+// }
 
 // TODO use this validation in parser
-pub fn is_valid_text_string(s: &str) -> bool {
-    let mut escaped = false;
-    for c in s.chars() {
-        match c {
-            '{' | '}' => {
-                if !escaped {
-                    return false;
-                }
-                escaped = false;
-                continue;
-            }
-            '\u{5C}' => {
-                escaped = !escaped;
-            }
-            _ => {
-                if escaped {
-                    // '|' is allowed for escaped char
-                    if c == '|' {
-                        escaped = false;
-                        continue;
-                    }
-                    return false;
-                }
-                if !is_text_char(c) {
-                    return false;
-                }
-                continue;
-            }
-        }
-    }
-    return !escaped;
-}
+// pub fn is_valid_text_string(s: &str) -> bool {
+//     let mut escaped = false;
+//     for c in s.chars() {
+//         match c {
+//             '{' | '}' => {
+//                 if !escaped {
+//                     return false;
+//                 }
+//                 escaped = false;
+//                 continue;
+//             }
+//             '\u{5C}' => {
+//                 escaped = !escaped;
+//             }
+//             _ => {
+//                 if escaped {
+//                     // '|' is allowed for escaped char
+//                     if c == '|' {
+//                         escaped = false;
+//                         continue;
+//                     }
+//                     return false;
+//                 }
+//                 if !is_text_char(c) {
+//                     return false;
+//                 }
+//                 continue;
+//             }
+//         }
+//     }
+//     return !escaped;
+// }
 
 pub fn is_valid_name_string(s: &str) -> bool {
     let mut initial_bidi = true;
@@ -206,14 +206,14 @@ pub fn is_valid_name_string(s: &str) -> bool {
 }
 
 // TODO use this validation in parser
-pub fn is_valid_unquoted_literal_string(s: &str) -> bool {
-    for c in s.chars() {
-        if !is_name_char(c) {
-            return false;
-        }
-    }
-    return true;
-}
+// pub fn is_valid_unquoted_literal_string(s: &str) -> bool {
+//     for c in s.chars() {
+//         if !is_name_char(c) {
+//             return false;
+//         }
+//     }
+//     return true;
+// }
 
 pub fn trim_tail_ws_and_bidi(s: &str) -> String {
     let mut i = s.chars().count();
